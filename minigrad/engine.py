@@ -36,7 +36,7 @@ class Value:
         out = Value(self.data**other, '**', (self,))
 
         def _backward():
-            self.grad += (other * self.data**(other-1))  *out.grad
+            self.grad += (other * self.data**(other-1))  * out.grad
         out._backward = _backward
         return out
     
@@ -95,15 +95,50 @@ class Tensor:
         self._op = _op
 
     def __add__(self, other):
+        if (isinstance(other, (int,float))):
+            out = Tensor(self.data + other, (self,), 'scalar+')
+            def _backward():
+                print(f"Backward: {out}")
+                self.grad += out.grad
+            self._backward = _backward
+            return out
+        other = other if isinstance(other, Tensor) else Tensor(other)
         assert self.shape == other.shape, "Tensor shapes should match for addition" # Check Shape
         out = Tensor(np.add(self.data, other.data), (self, other), '+')
         def _backward():
+            print(f"Backward: {out}")
             self.grad += out.grad
             other.grad += out.grad
         self._backward = _backward
         return out
+    
+    def __pow__(self, other):
+        assert isinstance(other, (int,float)), "Only support int,float for exponent"
+        assert (self.shape == (1,1)) or (self.shape == (1,)), "only support single value exponent" # TODO: should be updated for any dimension base Tensor
+        out = Tensor(np.float_power(self.data,other), (self,), '**')
+        def _backward():
+            print(f"Backward: {out}")
+            self.grad += (other * self.data[0][0]**(other-1)) * out.grad
+        self._backward = _backward
+        return out
+
+    
+    def __neg__(self):
+        return self * -1
+    
+    def __radd__(self,other):
+        return self + other
+
+    def __sub__(self,other):
+        return self + (-other)
 
     def __mul__(self,other):
+        if (isinstance(other, (int,float))): # Handle Scalar multiplication
+            out = Tensor(self.data * other, (self,), 'scalar*')
+            def _backward():
+                self.grad += other * out.grad
+            self._backward = _backward
+            return
         assert self.shape == other.shape, "Tensor shapes should match for element-wise multiplication" # Check Shape
         out = Tensor(np.multiply(self.data, other.data), (self,other), '*')
         def _backward():
@@ -113,10 +148,12 @@ class Tensor:
         return out
 
     def __matmul__(self,other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
         assert len(self.shape) <= 2 and len(other.shape) <= 2, "Tensors must be 1D or 2D for matmul"
         assert self.shape[1] == other.shape[0], "Tensors must have dimensions (n,p), (p,q) for matmul"
         out = Tensor(np.matmul(self.data, other.data), (self,other), '@')
         def _backward():
+            print((len(self.shape), len(other.shape)))
             if len(self.shape) == 2 and len(other.shape) == 2:  # Matrix-Matrix product
                 self.grad += out.grad @ other.data.T
                 other.grad += self.data.T @ out.grad
@@ -129,6 +166,14 @@ class Tensor:
         self._backward = _backward
         return out
     
+    @property
+    def T(self):
+        out = Tensor(np.transpose(self.data), (self,), 'T')
+        def _backward():
+            self.grad += out.grad.T
+        out._backward = _backward
+        return out
+    
     def relu(self):
         out = Tensor(np.maximum(0, self.data), (self,), 'relu')
         def _backward():
@@ -139,7 +184,7 @@ class Tensor:
         return out
 
     def __repr__(self) -> str:
-        return f"Tensor(data={self.data} shape={self.shape} grad={self.grad})"
+        return f"Tensor(data={self.data} shape={self.shape} grad={self.grad} _op={self._op})"
     
     def backward(self):
         # Build topology of all nodes in the graph
@@ -157,7 +202,12 @@ class Tensor:
         self.grad = np.ones(self.shape)
 
         # Compute grad for all children
+        i = 0
         for n in reversed(topo):
             n._backward()
+            i += 1
+            if i == 3:
+                exit(0)
+
             
 
