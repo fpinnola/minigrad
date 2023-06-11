@@ -73,6 +73,13 @@ class TLayer:
     def parameters(self):
         return [self.w, self.b]
     
+    def ind_parameters(self):
+        params = []
+        w_flat = self.w.data.reshape(self.w.shape[0] * self.w.shape[1],).tolist()
+        w_flat.extend(self.b.data[0].tolist())
+
+        return w_flat
+    
 class TMLP:
     def __init__(self, nin:int, nouts:list[int]):
         sz = [nin] + nouts
@@ -88,6 +95,18 @@ class TMLP:
         params = []
         for l in self.layers:
             params.extend(l.parameters())
+        return params
+    
+    def zero_grad(self):
+        params = self.parameters()
+        for p in params:
+            p.grad = np.zeros(p.shape)
+        return
+
+    def ind_parameters(self):
+        params = []
+        for l in self.layers:
+            params.extend(l.ind_parameters())
         return params
     
 
@@ -107,7 +126,6 @@ if __name__ == "__main__":
     for _ in range(1000):
         ypred = [nn(x) for x in X]
         loss = sum([(yout - ygt)**2 for ygt, yout in zip(Y, ypred)])
-        # print(loss)
 
         # zero grad
         for p in nn.parameters():
@@ -118,7 +136,7 @@ if __name__ == "__main__":
             p.data += -0.01 * p.grad
         
     ypred = [nn(x) for x in X]
-    print(ypred)
+    # print(ypred)
 
     # Tensor Approach (Tensor)
     model = TMLP(3, [4,4,1])
@@ -132,7 +150,6 @@ if __name__ == "__main__":
             p.grad = np.zeros(p.shape)
 
         loss.backward()
-        # print(loss)
 
         for p in model.parameters():
             p.data += p.grad * -0.01

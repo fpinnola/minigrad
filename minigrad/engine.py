@@ -136,7 +136,7 @@ class Tensor:
             def _backward():
                 self.grad += other * out.grad
             out._backward = _backward
-            return
+            return out
         assert self.shape == other.shape, "Tensor shapes should match for element-wise multiplication" # Check Shape
         out = Tensor(np.multiply(self.data, other.data), (self,other), '*')
         def _backward():
@@ -186,6 +186,9 @@ class Tensor:
             self.grad += vals * out.grad
         out._backward = _backward
         return out
+    
+    def __rmul__(self,other):
+        return self * other
 
     def __repr__(self) -> str:
         return f"Tensor(data={self.data} shape={self.shape} grad={self.grad} _op={self._op})"
