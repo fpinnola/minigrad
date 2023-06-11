@@ -1,3 +1,5 @@
+import numpy as np
+
 class Value:
     def __init__(self, data, op='', prev=()) -> None:
         self.data = data
@@ -83,7 +85,6 @@ class Value:
     def __rsub__(self, other):
         return self - other
 
-import numpy as np
 class Tensor:
     def __init__(self, data, _prev=(), _op=''):
         data = data if isinstance(data, np.ndarray) else np.ndarray(data)
@@ -98,18 +99,16 @@ class Tensor:
         if (isinstance(other, (int,float))):
             out = Tensor(self.data + other, (self,), 'scalar+')
             def _backward():
-                print(f"Backward: {out}")
                 self.grad += out.grad
-            self._backward = _backward
+            out._backward = _backward
             return out
         other = other if isinstance(other, Tensor) else Tensor(other)
         assert self.shape == other.shape, "Tensor shapes should match for addition" # Check Shape
         out = Tensor(np.add(self.data, other.data), (self, other), '+')
         def _backward():
-            print(f"Backward: {out}")
             self.grad += out.grad
             other.grad += out.grad
-        self._backward = _backward
+        out._backward = _backward
         return out
     
     def __pow__(self, other):
@@ -117,9 +116,8 @@ class Tensor:
         assert (self.shape == (1,1)) or (self.shape == (1,)), "only support single value exponent" # TODO: should be updated for any dimension base Tensor
         out = Tensor(np.float_power(self.data,other), (self,), '**')
         def _backward():
-            print(f"Backward: {out}")
             self.grad += (other * self.data[0][0]**(other-1)) * out.grad
-        self._backward = _backward
+        out._backward = _backward
         return out
 
     
@@ -137,14 +135,14 @@ class Tensor:
             out = Tensor(self.data * other, (self,), 'scalar*')
             def _backward():
                 self.grad += other * out.grad
-            self._backward = _backward
+            out._backward = _backward
             return
         assert self.shape == other.shape, "Tensor shapes should match for element-wise multiplication" # Check Shape
         out = Tensor(np.multiply(self.data, other.data), (self,other), '*')
         def _backward():
             self.grad += np.multiply(other.data, out.grad)
             other.grad += np.multiply(self.data, out.grad)
-        self._backward = _backward
+        out._backward = _backward
         return out
 
     def __matmul__(self,other):
@@ -153,7 +151,6 @@ class Tensor:
         assert self.shape[1] == other.shape[0], "Tensors must have dimensions (n,p), (p,q) for matmul"
         out = Tensor(np.matmul(self.data, other.data), (self,other), '@')
         def _backward():
-            print((len(self.shape), len(other.shape)))
             if len(self.shape) == 2 and len(other.shape) == 2:  # Matrix-Matrix product
                 self.grad += out.grad @ other.data.T
                 other.grad += self.data.T @ out.grad
@@ -163,7 +160,14 @@ class Tensor:
             elif len(self.shape) == 1 and len(other.shape) == 2:  # Vector-Matrix product
                 self.grad += other.data @ out.grad
                 other.grad += np.outer(self.data, out.grad)
-        self._backward = _backward
+        out._backward = _backward
+        return out
+    
+    def transpose(self):
+        out = Tensor(np.transpose(self.data), (self,), 'T')
+        def _backward():
+            self.grad += out.grad.T
+        out._backward = _backward
         return out
     
     @property
@@ -180,7 +184,7 @@ class Tensor:
             vals = np.array([1 if e > 0 else 0 for e in self.data])
             vals = np.reshape(vals, self.shape)
             self.grad += vals * out.grad
-        self._backward = _backward
+        out._backward = _backward
         return out
 
     def __repr__(self) -> str:
@@ -205,9 +209,6 @@ class Tensor:
         i = 0
         for n in reversed(topo):
             n._backward()
-            i += 1
-            if i == 3:
-                exit(0)
 
             
 

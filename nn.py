@@ -3,6 +3,7 @@ from minigrad.engine import Value, Tensor
 import random
 import numpy as np
 
+# MLP using single neurons
 class Neuron:
     def __init__(self, nin, nonlin=True):
         self.w = [Value(random.uniform(-1,1)) for _ in range(nin)]
@@ -50,32 +51,7 @@ class MLP:
         return params
     
 
-# if __name__ == "__main__":
-#     print("Hello")
-#     random.seed(42)
-#     X = [[2.0, 3.0, -1.0],
-#          [3.0, -1.0, 0.5],
-#          [0.5, 1.0, 1.0],
-#          [1.0, 1.0, -1.0]]
-#     Y = [1.0, -1.0, -1.0, 1.0]
-#     nn = MLP(3, [4,4,1])
-
-
-#     for _ in range(1000):
-#         ypred = [nn(x) for x in X]
-#         loss = sum([(yout - ygt)**2 for ygt, yout in zip(Y, ypred)])
-#         print(loss)
-#         for p in nn.parameters():
-#             p.grad = 0
-
-#         loss.backward()
-#         for p in nn.parameters():
-#             p.data += -0.01 * p.grad
-        
-#     ypred = [nn(x) for x in X]
-#     print(ypred)
-
-    
+# MLP Using Tensors    
 class TLayer:
     def __init__(self, nin, nout, nonlin=True):
         # Determine shape of weights for layer
@@ -91,7 +67,7 @@ class TLayer:
         self.nonlin = nonlin
         
     def __call__(self, x:Tensor, *args: Any, **kwds: Any) -> Any:
-        act = self.w.T @ x + self.b
+        act = (self.w.T @ x) + self.b
         return act.relu() if self.nonlin else act
 
     def parameters(self):
@@ -122,13 +98,44 @@ if __name__ == "__main__":
          np.array([[3.0], [-1.0], [0.5]]),
          np.array([[0.5], [1.0], [1.0]]),
          np.array([[1.0], [1.0], [-1.0]])]
+    
     Y = [1.0, -1.0, -1.0, 1.0]
-    model = TMLP(3, [4,4,1])
-    print(len(model.parameters()))
-    ypred = [model(x) for x in X]
-    loss = sum([(yout - ygt)**2 for ygt, yout in zip(Y,ypred)])
 
-    loss.backward()
-    print(loss)
-    for p in model.parameters():
-        p += p.grad * -0.01
+    # Single Neuron Approach (Value)
+    nn = MLP(3, [4,4,1])
+
+    for _ in range(1000):
+        ypred = [nn(x) for x in X]
+        loss = sum([(yout - ygt)**2 for ygt, yout in zip(Y, ypred)])
+        # print(loss)
+
+        # zero grad
+        for p in nn.parameters():
+            p.grad = 0
+
+        loss.backward()
+        for p in nn.parameters():
+            p.data += -0.01 * p.grad
+        
+    ypred = [nn(x) for x in X]
+    print(ypred)
+
+    # Tensor Approach (Tensor)
+    model = TMLP(3, [4,4,1])
+
+    for _ in range(1000):
+        ypred = [model(x) for x in X]
+        loss = sum([(yout - ygt)**2 for ygt, yout in zip(Y,ypred)])
+
+        # zero grad
+        for p in model.parameters():
+            p.grad = np.zeros(p.shape)
+
+        loss.backward()
+        # print(loss)
+
+        for p in model.parameters():
+            p.data += p.grad * -0.01
+        
+    ypred = [model(x) for x in X]
+    print(ypred)
